@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 import platform
 import socket
+import os
 from datetime import datetime
 
 # root_path="/folgas" garante que redirects e docs funcionem corretamente
@@ -19,11 +20,13 @@ async def home(request: Request):
     hostname = socket.gethostname()
     now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-    # Reconstrói a URL pública a partir dos headers do proxy reverso (Nginx)
+    # URL pública: usa variável de ambiente (Coolify), headers do proxy, ou request.url
     forwarded_host = request.headers.get("x-forwarded-host")
     forwarded_proto = request.headers.get("x-forwarded-proto", "https")
     forwarded_prefix = request.headers.get("x-forwarded-prefix", "")
-    if forwarded_host:
+    if public_url_env := os.environ.get("PUBLIC_URL"):
+        public_url = public_url_env.rstrip("/") + "/"
+    elif forwarded_host:
         public_url = f"{forwarded_proto}://{forwarded_host}{forwarded_prefix}/"
     else:
         public_url = str(request.url)
