@@ -31,6 +31,13 @@ async def home(request: Request):
     else:
         public_url = str(request.url)
 
+    # Identifica o IP Real do Usuário através dos headers do proxy
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        client_ip = forwarded_for.split(",")[0].strip()
+    else:
+        client_ip = request.headers.get("x-real-ip") or (request.client.host if request.client else "n/a")
+
     html = f"""
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -196,7 +203,7 @@ async def home(request: Request):
                 </div>
                 <div class="card">
                     <div class="card-label">IP do Cliente</div>
-                    <div class="card-value">{request.client.host}</div>
+                    <div class="card-value">{client_ip}</div>
                 </div>
             </div>
 
