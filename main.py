@@ -38,6 +38,9 @@ async def home(request: Request):
     else:
         client_ip = request.headers.get("x-real-ip") or (request.client.host if request.client else "n/a")
 
+    # Lista formatada de todos os headers recebidos para debug
+    headers_debug = "<br/>".join(f"<strong>{k}:</strong> {v}" for k, v in sorted(request.headers.items()))
+
     html = f"""
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -208,11 +211,9 @@ async def home(request: Request):
             </div>
 
             <div class="card">
-                <div class="card-label">Headers recebidos (X-Forwarded)</div>
-                <div class="card-value highlight">
-                    X-Real-IP: {request.headers.get('x-real-ip', 'n/a')}<br/>
-                    X-Forwarded-For: {request.headers.get('x-forwarded-for', 'n/a')}<br/>
-                    X-Forwarded-Proto: {request.headers.get('x-forwarded-proto', 'n/a')}
+                <div class="card-label">Todos os Headers Recebidos (Debug)</div>
+                <div class="card-value highlight" style="font-size: 0.8rem; line-height: 1.6; word-break: break-all;">
+                    {headers_debug}
                 </div>
             </div>
 
