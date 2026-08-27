@@ -32,8 +32,9 @@ async def home(request: Request):
         public_url = str(request.url)
 
     # Identifica o IP Real do Usuário através dos headers do proxy
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
+    if x_client_ip := (request.headers.get("x-client-ip") or request.headers.get("true-client-ip")):
+        client_ip = x_client_ip.split(",")[0].strip()
+    elif forwarded_for := request.headers.get("x-forwarded-for"):
         client_ip = forwarded_for.split(",")[0].strip()
     else:
         client_ip = request.headers.get("x-real-ip") or (request.client.host if request.client else "n/a")
