@@ -19,6 +19,15 @@ async def home(request: Request):
     hostname = socket.gethostname()
     now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
+    # Reconstrói a URL pública a partir dos headers do proxy reverso (Nginx)
+    forwarded_host = request.headers.get("x-forwarded-host")
+    forwarded_proto = request.headers.get("x-forwarded-proto", "https")
+    forwarded_prefix = request.headers.get("x-forwarded-prefix", "")
+    if forwarded_host:
+        public_url = f"{forwarded_proto}://{forwarded_host}{forwarded_prefix}/"
+    else:
+        public_url = str(request.url)
+
     html = f"""
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -166,7 +175,7 @@ async def home(request: Request):
 
             <div class="card">
                 <div class="card-label">URL de Acesso</div>
-                <div class="card-value highlight">{request.url}</div>
+                <div class="card-value highlight">{public_url}</div>
             </div>
 
             <div class="grid">
