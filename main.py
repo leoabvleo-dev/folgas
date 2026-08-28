@@ -263,7 +263,7 @@ async def home(request: Request):
 
             <h1>STI UFPB<br/>Sistema de Folgas</h1>
             <p class="subtitle">
-                Gerência de Operações de Redes — Ambiente de teste via Coolify
+                Gerência de Operações de Redes — Ambiente de teste via Dokploy
             </p>
 
             <!-- Card do Commit -->
