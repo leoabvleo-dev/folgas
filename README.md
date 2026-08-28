@@ -55,3 +55,5 @@ nginx2 (sti.ufpb.br:443)
 Coolify Traefik (:80)
   roteia pelo Host header → container FastAPI (:5000)
 ```
+
+<!-- Deploy automático via Coolify e GitHub Actions ativo -->
