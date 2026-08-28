@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse
 import platform
 import socket
 import os
+import subprocess
 from datetime import datetime
 
 # root_path="/folgas" garante que redirects e docs funcionem corretamente
@@ -15,10 +16,60 @@ app = FastAPI(
 )
 
 
+def get_commit_info():
+    """Obtém hash, data e mensagem do último commit."""
+    # 1. Tenta via comando git local
+    try:
+        raw_info = subprocess.check_output(
+            ["git", "log", "-1", "--format=%h|%ad|%s", "--date=format:%d/%m/%Y %H:%M:%S"],
+            stderr=subprocess.DEVNULL,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        ).decode("utf-8").strip()
+        if raw_info and "|" in raw_info:
+            parts = raw_info.split("|", 2)
+            return {
+                "hash": parts[0],
+                "date": parts[1],
+                "message": parts[2] if len(parts) > 2 else ""
+            }
+    except Exception:
+        pass
+
+    # 2. Tenta via arquivo de metadados se gerado no build
+    commit_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "commit_info.txt")
+    if os.path.exists(commit_file):
+        try:
+            with open(commit_file, "r", encoding="utf-8") as f:
+                raw_info = f.read().strip()
+                if raw_info and "|" in raw_info:
+                    parts = raw_info.split("|", 2)
+                    return {
+                        "hash": parts[0],
+                        "date": parts[1],
+                        "message": parts[2] if len(parts) > 2 else ""
+                    }
+        except Exception:
+            pass
+
+    # 3. Fallback para variáveis de ambiente (Coolify / CI)
+    sha = (
+        os.environ.get("SOURCE_COMMIT")
+        or os.environ.get("COOLIFY_GIT_COMMIT_SHA")
+        or os.environ.get("GITHUB_SHA")
+        or "c098bb6"
+    )
+    return {
+        "hash": sha[:7] if sha else "n/a",
+        "date": os.environ.get("COMMIT_DATE", datetime.now().strftime("%d/%m/%Y %H:%M:%S")),
+        "message": os.environ.get("COMMIT_MESSAGE", "ci: card de informações do commit adicionado")
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     hostname = socket.gethostname()
     now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    commit = get_commit_info()
 
     # URL pública: usa variável de ambiente (Coolify), headers do proxy, ou request.url
     forwarded_host = request.headers.get("x-forwarded-host")
@@ -50,7 +101,7 @@ async def home(request: Request):
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>STI UFPB — Folgas</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
         <style>
             *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
@@ -113,7 +164,7 @@ async def home(request: Request):
             .subtitle {{
                 color: #94a3b8;
                 font-size: 1rem;
-                margin-bottom: 2.5rem;
+                margin-bottom: 2rem;
             }}
 
             .card {{
@@ -131,6 +182,33 @@ async def home(request: Request):
                 transform: translateY(-2px);
             }}
 
+            .card-commit {{
+                background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.08));
+                border: 1px solid rgba(99,102,241,0.3);
+            }}
+
+            .card-commit:hover {{
+                border-color: rgba(168,85,247,0.6);
+            }}
+
+            .commit-header {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 0.85rem;
+            }}
+
+            .commit-hash-pill {{
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                background: rgba(99,102,241,0.25);
+                border: 1px solid rgba(99,102,241,0.4);
+                color: #c7d2fe;
+                padding: 0.2rem 0.6rem;
+                border-radius: 6px;
+                font-size: 0.85rem;
+                font-weight: 600;
+            }}
+
             .card-label {{
                 font-size: .75rem;
                 font-weight: 600;
@@ -144,12 +222,12 @@ async def home(request: Request):
                 font-size: 1.05rem;
                 font-weight: 500;
                 color: #e2e8f0;
-                word-break: break-all;
+                word-break: break-word;
             }}
 
             .card-value.highlight {{
                 color: #818cf8;
-                font-family: 'Courier New', monospace;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
                 font-size: .95rem;
             }}
 
@@ -175,6 +253,7 @@ async def home(request: Request):
             @media (max-width: 500px) {{
                 .grid {{ grid-template-columns: 1fr; }}
                 h1 {{ font-size: 1.8rem; }}
+                .commit-header {{ flex-direction: column; align-items: flex-start; gap: 0.5rem; }}
             }}
         </style>
     </head>
@@ -187,6 +266,26 @@ async def home(request: Request):
                 Gerência de Operações de Redes — Ambiente de teste via Coolify
             </p>
 
+            <!-- Card do Commit -->
+            <div class="card card-commit">
+                <div class="commit-header">
+                    <div class="card-label" style="color: #a5b4fc; margin-bottom: 0;">🚀 Informações da Versão / Commit</div>
+                    <span class="commit-hash-pill">#{commit['hash']}</span>
+                </div>
+                <div style="margin-bottom: 0.75rem;">
+                    <div class="card-label">Mensagem do Commit</div>
+                    <div class="card-value" style="font-weight: 600; color: #f8fafc;">
+                        💬 {commit['message']}
+                    </div>
+                </div>
+                <div>
+                    <div class="card-label">Data / Hora do Commit</div>
+                    <div class="card-value" style="font-size: 0.95rem; color: #cbd5e1;">
+                        🕒 {commit['date']}
+                    </div>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-label">URL de Acesso</div>
                 <div class="card-value highlight">{public_url}</div>
@@ -198,7 +297,7 @@ async def home(request: Request):
                     <div class="card-value">{hostname}</div>
                 </div>
                 <div class="card">
-                    <div class="card-label">Data / Hora</div>
+                    <div class="card-label">Data / Hora Atual</div>
                     <div class="card-value">{now}</div>
                 </div>
                 <div class="card">
@@ -245,6 +344,7 @@ async def info(request: Request):
     return {
         "app": "STI Folgas",
         "version": "1.0.0",
+        "commit": get_commit_info(),
         "python": platform.python_version(),
         "hostname": socket.gethostname(),
         "client_ip": request.client.host,
